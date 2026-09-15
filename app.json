@@ -1,0 +1,21 @@
+{
+  "package_id": "com.kickstartcrew.relaysight",
+  "edition": "202601",
+  "name": "Relay Sight",
+  "version": "0.2.0",
+  "min_app_version": "2.2.10",
+  "min_sdk_version": "0.0.15",
+  "entrypoint": "index.html",
+  "permissions": [
+    {
+      "name": "network",
+      "desc": "Sends voice messages to and receives text replies from the user's Telegram bots.",
+      "whitelist": ["https://api.telegram.org"]
+    },
+    {
+      "name": "g2-microphone",
+      "desc": "Records voice prompts from the Even G2 microphone when the user presses to talk."
+    }
+  ],
+  "supported_languages": ["en"]
+}

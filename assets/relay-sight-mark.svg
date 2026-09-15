@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Relay Sight logo</title>
+  <desc id="description">A pixel-built glasses lens containing an audio signal and speech bubble.</desc>
+
+  <g fill="#ffffff">
+    <!-- Left and right touch points suggest a glasses frame without copying hardware branding. -->
+    <path fill-rule="evenodd" d="M80 432h112v32h48v96h-48v32H80V432Zm48 48v64h48v-64h-48Z"/>
+    <path fill-rule="evenodd" d="M944 432H832v32h-48v96h48v32h112V432Zm-48 48v64h-48v-64h48Z"/>
+
+    <!-- Stepped outer lens / field-of-view frame. -->
+    <path fill-rule="evenodd" d="M320 256h384v32h80v48h48v352h-48v48h-80v32H320v-32h-80v-48h-48V336h48v-48h80v-32Zm0 96h384v16h48v288h-48v16H320v-16h-48V368h48v-16Z"/>
+
+    <!-- Voice waveform moving into the reply bubble. -->
+    <rect x="336" y="480" width="48" height="64"/>
+    <rect x="400" y="448" width="48" height="128"/>
+    <rect x="464" y="416" width="48" height="192"/>
+
+    <!-- Pixel speech bubble with a transparent center and stepped tail. -->
+    <path fill-rule="evenodd" d="M544 400h128v32h48v144h-48v32h-32v32h-48v-32h-48V400Zm48 64v80h80v-80h-80Z"/>
+  </g>
+</svg>

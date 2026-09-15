@@ -1,0 +1,30 @@
+{
+  "name": "g2-relay-sight",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Serverless Even Realities G2 voice client for Telegram-connected AI agents.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --test --import tsx ./test/*.test.ts",
+    "typecheck": "tsc --noEmit --pretty false",
+    "pack": "npm run build && evenhub pack app.json dist -o relay-sight.ehpk --sdk-ver 0.0.15"
+  },
+  "dependencies": {
+    "@audio/encode-opus": "1.3.0",
+    "@evenrealities/even_hub_sdk": "0.0.15",
+    "@evenrealities/pretext": "0.1.4"
+  },
+  "devDependencies": {
+    "@evenrealities/evenhub-cli": "0.1.14",
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "8.2.2"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}
