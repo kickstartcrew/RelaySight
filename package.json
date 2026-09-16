@@ -1,6 +1,6 @@
 {
   "name": "g2-relay-sight",
-  "version": "0.2.0",
+  "version": "0.2.3",
   "private": true,
   "description": "Serverless Even Realities G2 voice client for Telegram-connected AI agents.",
   "license": "MIT",

@@ -2,6 +2,8 @@ import {
   AudioInputSource,
   CreateStartUpPageContainer,
   EventSourceType,
+  MenuContainerProperty,
+  MenuItemProperty,
   OsEventTypeList,
   StartUpPageCreateResult,
   TextContainerProperty,
@@ -21,6 +23,8 @@ const CONTAINERS = {
   page: { id: 5, name: 'page' },
 } as const;
 
+export const CANCEL_RECORDING_MENU_ID = 1;
+
 function bodyContent(frame: GlassFrame): string {
   if (!frame.title) return frame.body;
   return `${frame.title}\n\n${frame.body}`;
@@ -29,6 +33,9 @@ function bodyContent(frame: GlassFrame): string {
 export function createGlassesPage(frame: GlassFrame): CreateStartUpPageContainer {
   return new CreateStartUpPageContainer({
     containerTotalNum: 5,
+    menuObject: new MenuContainerProperty({
+      menuItems: [new MenuItemProperty({ itemID: CANCEL_RECORDING_MENU_ID, itemName: 'Cancel recording' })],
+    }),
     textObject: [
       new TextContainerProperty({
         xPosition: GLASSES_LAYOUT.brand.x, yPosition: GLASSES_LAYOUT.brand.y,
@@ -73,14 +80,14 @@ export function createGlassesPage(frame: GlassFrame): CreateStartUpPageContainer
 
 function withTimeout<T>(operation: Promise<T>, milliseconds = 7_000): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error('The glasses connection timed out.')), milliseconds);
+    const timer = globalThis.setTimeout(() => reject(new Error('The glasses connection timed out.')), milliseconds);
     void operation.then(
       (value) => {
-        window.clearTimeout(timer);
+        globalThis.clearTimeout(timer);
         resolve(value);
       },
       (error: unknown) => {
-        window.clearTimeout(timer);
+        globalThis.clearTimeout(timer);
         reject(error);
       },
     );
@@ -165,6 +172,27 @@ export function textEventType(event: EvenHubEvent): OsEventTypeList | undefined 
 
 export function systemEventType(event: EvenHubEvent): OsEventTypeList | undefined {
   return OsEventTypeList.fromJson(event.sysEvent?.eventType);
+}
+
+/** A double press can arrive on either envelope, depending on the host. */
+export function isDoublePress(event: EvenHubEvent): boolean {
+  return textEventType(event) === OsEventTypeList.DOUBLE_CLICK_EVENT
+    || systemEventType(event) === OsEventTypeList.DOUBLE_CLICK_EVENT;
+}
+
+/** Long press is delivered as an app event on some hosts and opens the OS menu on others. */
+export function isCancelRecordingInput(event: EvenHubEvent): boolean {
+  return systemEventType(event) === OsEventTypeList.LONG_PRESS_EVENT
+    || event.menuItemClickEvent?.itemID === CANCEL_RECORDING_MENU_ID;
+}
+
+/** Returns no request for unrelated events, so callers can route them normally. */
+export function requestExitOnDoublePress(
+  event: EvenHubEvent,
+  glasses: Pick<EvenGlasses, 'requestExit'> | null,
+): Promise<boolean> | undefined {
+  if (!glasses || !isDoublePress(event)) return undefined;
+  return glasses.requestExit();
 }
 
 /** CLICK_EVENT is ordinal zero and is missing on some host/SDK combinations. */

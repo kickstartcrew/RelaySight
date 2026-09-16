@@ -68,10 +68,11 @@ Do not configure a webhook or run another `getUpdates` client for Bot B. Relay S
 
 - **Single press:** start recording.
 - **Single press again:** stop and send.
-- **Hold and speak:** start recording; release to send.
-- **Double press while recording:** cancel.
+- **Double press from any screen:** open the system exit confirmation dialog.
+- **Swipe up while recording:** cancel without sending.
+- **Long press while recording:** cancel if the host delivers the long-press event to the app. If the system menu opens instead (tap, then hold), select **Cancel recording** there.
 - **Swipe down:** next conversation page.
-- **Swipe up:** previous conversation page.
+- **Swipe up while reading:** previous conversation page.
 
 Recordings stop automatically at 90 seconds. Relay Sight encodes the G2's mono 16 kHz PCM locally into an Ogg/Opus Telegram voice message. Transcription happens through the agent's configured speech-to-text provider.
 

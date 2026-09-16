@@ -14,7 +14,7 @@ import {
   validateBotUsername,
   type AppConfig,
 } from './config';
-import { describeEvenEvent, EvenGlasses, isPhysicalPress, systemEventType, textEventType } from './even';
+import { describeEvenEvent, EvenGlasses, isCancelRecordingInput, isPhysicalPress, requestExitOnDoublePress, systemEventType, textEventType } from './even';
 import { glassFrame, initialState, type GlassFrame } from './state';
 import { createBrowserLocalStore, createEvenLocalStore } from './storage';
 import { probeTelegramReachability, TelegramClient } from './telegram';
@@ -69,9 +69,8 @@ const controller = new AppController(glasses, store, {
 });
 
 let lastPrimaryPressAt = 0;
+let suppressPressUntil = 0;
 let receivedAudioBytes = 0;
-let longPressRecording = false;
-let primaryAction: Promise<void> = Promise.resolve();
 const unsubscribe = bridge?.onEvenHubEvent(handleEvenEvent);
 
 ui.runtimeBadge.textContent = bridge ? 'G2 bridge connected' : 'Browser preview mode';
@@ -85,6 +84,7 @@ if (evenGlasses) {
   try {
     await evenGlasses.initialize(glassFrame(initialState));
   } catch (error) {
+    console.error(`G2 display initialization failed: ${messageOf(error)}`);
     ui.status.textContent = messageOf(error);
   }
 }
@@ -212,6 +212,19 @@ async function runPrimaryPress(origin: string): Promise<void> {
   }
 }
 
+function cancelActiveRecording(origin: string): void {
+  const mode = controller.snapshot().mode;
+  if (mode !== 'starting' && mode !== 'recording') {
+    ui.deviceDiagnostic.textContent = `${origin} · no recording to cancel`;
+    return;
+  }
+  ui.deviceDiagnostic.textContent = `${origin} · cancelling recording`;
+  void controller.cancelRecording().then(
+    (cancelled) => { ui.deviceDiagnostic.textContent = cancelled ? `${origin} · recording discarded` : `${origin} · too late to cancel`; },
+    (error: unknown) => { ui.deviceDiagnostic.textContent = `Could not cancel recording · ${messageOf(error)}`; },
+  );
+}
+
 ui.testForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const text = ui.testInput.value;
@@ -230,32 +243,42 @@ function handleEvenEvent(event: EvenHubEvent): void {
   const textType = textEventType(event);
   const sysType = systemEventType(event);
 
-  // Official routing: a text container with isEventCapture: 1 receives press,
-  // double-press, and scroll. CLICK_EVENT (ordinal 0) can arrive undefined.
-  if (isPhysicalPress(event)) {
+  // The root page must always open the system exit dialog on double press,
+  // including while recording. Keep resources alive until exit is confirmed.
+  const exitRequest = requestExitOnDoublePress(event, evenGlasses);
+  if (exitRequest) {
+    ui.deviceDiagnostic.textContent = `${describeEvenEvent(event)} · opening exit dialog`;
+    void exitRequest.then(
+      (accepted) => {
+        if (!accepted) ui.deviceDiagnostic.textContent = 'The G2 did not accept the exit-dialog request.';
+      },
+      (error: unknown) => {
+        ui.deviceDiagnostic.textContent = `Could not open exit dialog · ${messageOf(error)}`;
+      },
+    );
+  }
+  else if (isCancelRecordingInput(event)) {
+    // A held press may open the OS menu instead of reaching the app. Both the
+    // raw long-press event and its menu action discard the current recording.
+    if (sysType === OsEventTypeList.LONG_PRESS_EVENT) suppressPressUntil = Date.now() + 600;
+    cancelActiveRecording(describeEvenEvent(event));
+  }
+  // CLICK_EVENT (ordinal 0) can arrive undefined on either event envelope.
+  else if (isPhysicalPress(event)) {
     const now = Date.now();
-    if (now - lastPrimaryPressAt < 300) {
+    if (now < suppressPressUntil || now - lastPrimaryPressAt < 300) {
       ui.deviceDiagnostic.textContent = `${describeEvenEvent(event)} · duplicate ignored`;
       return;
     }
     lastPrimaryPressAt = now;
-    primaryAction = runPrimaryPress('G2 / R1');
-  }
-  else if (textType === OsEventTypeList.DOUBLE_CLICK_EVENT || sysType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
-    ui.deviceDiagnostic.textContent = `${describeEvenEvent(event)} · recording cancelled`;
-    void controller.cancelRecording();
+    void runPrimaryPress('G2 / R1');
   }
   else if (textType === OsEventTypeList.SCROLL_BOTTOM_EVENT) void controller.nextPage();
-  else if (textType === OsEventTypeList.SCROLL_TOP_EVENT) void controller.previousPage();
-  else if (sysType === OsEventTypeList.LONG_PRESS_EVENT) {
-    longPressRecording = ['ready', 'reading'].includes(controller.snapshot().mode);
-    if (longPressRecording) primaryAction = runPrimaryPress('G2 / R1 hold');
-  }
-  else if (sysType === OsEventTypeList.LONG_PRESS_RELEASE_EVENT && longPressRecording) {
-    longPressRecording = false;
-    void primaryAction.then(() => {
-      if (controller.snapshot().mode === 'recording') return runPrimaryPress('G2 / R1 release');
-    });
+  else if (textType === OsEventTypeList.SCROLL_TOP_EVENT) {
+    if (['starting', 'recording'].includes(controller.snapshot().mode)) {
+      cancelActiveRecording('G2 / R1 swipe up');
+    }
+    else void controller.previousPage();
   }
   else if (sysType === OsEventTypeList.FOREGROUND_ENTER_EVENT) {
     ui.deviceDiagnostic.textContent = describeEvenEvent(event);
@@ -266,17 +289,14 @@ function handleEvenEvent(event: EvenHubEvent): void {
     // remains alive, so polling and an active recording must continue.
     ui.deviceDiagnostic.textContent = describeEvenEvent(event);
   }
-  else if (sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT) {
-    controller.stopPolling();
-    void controller.cancelRecording();
-  } else if (sysType === OsEventTypeList.SYSTEM_EXIT_EVENT) {
-    controller.stopPolling();
-    void controller.cancelRecording().finally(() => evenGlasses?.requestExit());
+  else if (sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT || sysType === OsEventTypeList.SYSTEM_EXIT_EVENT) {
+    void controller.shutdown().catch((error) => {
+      ui.deviceDiagnostic.textContent = `Exit cleanup failed · ${messageOf(error)}`;
+    });
   }
 }
 
 window.addEventListener('pagehide', () => {
-  controller.stopPolling();
-  void controller.cancelRecording();
+  void controller.shutdown().catch(() => undefined);
   unsubscribe?.();
 });

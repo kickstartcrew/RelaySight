@@ -67,9 +67,49 @@ test('recording can be cancelled without sending', async () => {
   await controller.configure(config, false);
   await controller.startRecording();
   assert.equal(controller.snapshot().mode, 'recording');
-  await controller.cancelRecording();
+  assert.equal(await controller.cancelRecording(), true);
   assert.equal(controller.snapshot().mode, 'ready');
   controller.stopPolling();
+});
+
+test('a press during cancellation cannot send the discarded recording', async () => {
+  const store = new MemoryStore();
+  store.values.set(UPDATE_OFFSET_STORAGE_KEY, '1');
+  const glasses = new FakeGlasses();
+  const telegram = new FakeTelegram();
+  let sent = 0;
+  telegram.sendVoicePrompt = async () => { sent += 1; return { message_id: 1, date: 1 }; };
+  const controller = new AppController(glasses, store, {}, () => telegram);
+  await controller.configure(config, false);
+  await controller.startRecording();
+  controller.acceptPcm(new Uint8Array(16_000));
+
+  let releaseStop: ((stopped: boolean) => void) | undefined;
+  glasses.stopMicrophone = () => new Promise((resolve) => { releaseStop = resolve; });
+  const cancellation = controller.cancelRecording();
+  const latePress = controller.handlePrimaryPress();
+  releaseStop?.(true);
+  await Promise.all([cancellation, latePress]);
+
+  assert.equal(controller.snapshot().mode, 'ready');
+  assert.equal(sent, 0);
+  controller.stopPolling();
+});
+
+test('confirmed system exit stops recording without repainting the closed page', async () => {
+  const store = new MemoryStore();
+  store.values.set(UPDATE_OFFSET_STORAGE_KEY, '1');
+  const glasses = new FakeGlasses();
+  const controller = new AppController(glasses, store, {}, () => new FakeTelegram());
+  await controller.configure(config, false);
+  await controller.startRecording();
+  const rendersBeforeExit = glasses.renders.length;
+
+  await controller.shutdown();
+  await controller.shutdown(); // Host may also emit pagehide after SYSTEM_EXIT_EVENT.
+
+  assert.equal(glasses.stopCount, 1);
+  assert.equal(glasses.renders.length, rendersBeforeExit);
 });
 
 test('cancelling while the microphone is starting stops a late start', async () => {

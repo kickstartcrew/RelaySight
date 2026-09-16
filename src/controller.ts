@@ -47,8 +47,10 @@ export class AppController {
   private pollGeneration = 0;
   private recordingGeneration = 0;
   private finishingRecording = false;
+  private cancellingRecording = false;
   private pendingReplyText: string | null = null;
   private responseTurnStarted = false;
+  private shuttingDown = false;
 
   constructor(
     private readonly glasses: GlassesPort,
@@ -122,7 +124,7 @@ export class AppController {
   }
 
   async stopAndSendRecording(): Promise<void> {
-    if (this.state.mode !== 'recording' || this.finishingRecording || !this.telegram || !this.config) return;
+    if (this.state.mode !== 'recording' || this.finishingRecording || this.cancellingRecording || !this.telegram || !this.config) return;
     this.finishingRecording = true;
     try {
       await this.glasses.stopMicrophone();
@@ -147,12 +149,33 @@ export class AppController {
     }
   }
 
-  async cancelRecording(): Promise<void> {
-    if (this.state.mode !== 'starting' && this.state.mode !== 'recording') return;
+  async cancelRecording(): Promise<boolean> {
+    if ((this.state.mode !== 'starting' && this.state.mode !== 'recording') || this.finishingRecording || this.cancellingRecording) return false;
+    this.cancellingRecording = true;
     this.recordingGeneration += 1;
-    await this.glasses.stopMicrophone();
-    this.recorder.reset();
-    await this.dispatch({ type: 'CONFIG_READY' });
+    try {
+      await this.glasses.stopMicrophone();
+      this.recorder.reset();
+      await this.dispatch({ type: 'CONFIG_READY' });
+      return true;
+    } finally {
+      this.cancellingRecording = false;
+    }
+  }
+
+  /** Stop background work after the host exits, without repainting a closed page. */
+  async shutdown(): Promise<void> {
+    if (this.shuttingDown) return;
+    this.shuttingDown = true;
+    this.stopPolling();
+    this.recordingGeneration += 1;
+    try {
+      if (this.state.mode === 'starting' || this.state.mode === 'recording') {
+        await this.glasses.stopMicrophone();
+      }
+    } finally {
+      this.recorder.reset();
+    }
   }
 
   async sendTestText(text: string): Promise<void> {

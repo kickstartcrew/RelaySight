@@ -152,11 +152,11 @@ export function glassFrame(state: AppState): GlassFrame {
     case 'unconfigured':
       return { status: '○  SETUP', title: 'WELCOME TO RELAY SIGHT', body: 'Connect your agent from the phone to begin.', hint: 'OPEN EVEN APP', page: 'G2', statusBrightness: 2 };
     case 'ready':
-      return { status: '●  READY', title: 'ASK YOUR AGENT', body: 'Press once, then speak naturally.\n\nPress again to send.', hint: 'PRESS OR HOLD  TALK', page: 'PRIVATE', statusBrightness: 4 };
+      return { status: '●  READY', title: 'ASK YOUR AGENT', body: 'Press once, then speak naturally.\n\nPress again to send.', hint: 'PRESS  TALK', page: 'PRIVATE', statusBrightness: 4 };
     case 'starting':
       return { status: '○  STARTING', title: 'OPENING MICROPHONES', body: 'One moment...', hint: 'KEEP GLASSES ON', page: '', statusBrightness: 3 };
     case 'recording':
-      return { status: '●  LISTENING', title: 'SPEAK NATURALLY', body: '━━━━━━━━━━━━━━━━━━\n\nYour agent is listening.', hint: 'PRESS  SEND  /  DOUBLE  CANCEL', page: '90s MAX', statusBrightness: 4 };
+      return { status: '●  LISTENING', title: 'SPEAK NATURALLY', body: '━━━━━━━━━━━━━━━━━━\n\nYour agent is listening.', hint: 'PRESS SEND / UP CANCEL', page: '90s MAX', statusBrightness: 4 };
     case 'sending':
       return { status: '○  SENDING', title: 'MESSAGE ON ITS WAY', body: 'Transporting your voice through Telegram...', hint: 'VOICE CAPTURED', page: '', statusBrightness: 3 };
     case 'waiting':
